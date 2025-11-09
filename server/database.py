@@ -1,19 +1,10 @@
-# usa postgres via psycopg2
-import psycopg2
+# sqlite3 pra criar e mexer no banco
+import sqlite3
 
 class Database:
-    def __init__(self, db_url):
-        # tenta conectar no postgres usando a URL do Render
-        # (sslmode=require é obrigatório no Render)
-        try:
-            self.conn = psycopg2.connect(db_url, sslmode='require')
-            print("[Database] Beleza! Conectou no postgres.")
-        except psycopg2.OperationalError as e:
-            print(f"[Database] Deu ruim: Não rolou conectar no postgres: {e}")
-            raise
-            
-        # postgres já lida com threads sozinho, não precisa de config especial
-        
+    def __init__(self, db_path="chat.db"):
+        # precisa do check_same_thread=False pq várias threads vão usar o banco
+        self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.create_user_table()
         self.create_message_table()
         self.create_group_tables()
@@ -21,8 +12,6 @@ class Database:
     # --- Funções dos Usuários ---
 
     def create_user_table(self):
-        # tabela de users: nome único e hash da senha
-        # postgres e sqlite aceitam IF NOT EXISTS
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
@@ -34,24 +23,24 @@ class Database:
     
     def user_exists(self, username):
         # ve se tem algum user com esse nome
-        # no postgres usa %s em vez de ? pra placeholder
         cursor = self.conn.cursor()
-        cursor.execute("SELECT 1 FROM users WHERE username=%s", (username,))
+        cursor.execute("SELECT 1 FROM users WHERE username=?", (username,))
         return cursor.fetchone() is not None
     
     def create_user(self, username, password_hash):
+        # adiciona um novo user no banco
         cursor = self.conn.cursor()
-        # placeholder do psycopg2 usa %s
-        cursor.execute("INSERT INTO users (username, password_hash) VALUES (%s, %s)", (username, password_hash))
+        cursor.execute("INSERT INTO users (username, password_hash) VALUES (?, ?)", (username, password_hash))
         self.conn.commit()
     
     def get_user_password_hash(self, username):
+        # pega o hash da senha pra comparar depois
         cursor = self.conn.cursor()
-        # placeholder do psycopg2 usa %s
-        cursor.execute("SELECT password_hash FROM users WHERE username=%s", (username,))
+        cursor.execute("SELECT password_hash FROM users WHERE username=?", (username,))
         result = cursor.fetchone()
         return result[0] if result else None
     
+    #Lista todos os usuários (para o comando 'list_all')
     def get_all_users(self):
         cursor = self.conn.cursor()
         cursor.execute("SELECT username FROM users")
@@ -60,54 +49,49 @@ class Database:
     # --- Mensagens Offline ---
     
     def create_message_table(self):
-        # tabela pra mensagens offline:
-        # - SERIAL é tipo o AUTOINCREMENT do sqlite
-        # - TIMESTAMPTZ guarda data/hora com timezone
+        # guarda mensagens enviadas quando o user tá offline
         cursor = self.conn.cursor()
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS offline_messages (
-                id SERIAL PRIMARY KEY, 
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
                 sender TEXT NOT NULL,
                 receiver TEXT NOT NULL,
                 message TEXT NOT NULL,
-                timestamp TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         """)
         self.conn.commit()
     
     def save_message(self, sender, receiver, message):
-        # guarda msg quando alguém tá offline
+        # salva msg quando o destinatário tá offline
         cursor = self.conn.cursor()
         cursor.execute(
-            "INSERT INTO offline_messages (sender, receiver, message) VALUES (%s, %s, %s)",
+            "INSERT INTO offline_messages (sender, receiver, message) VALUES (?, ?, ?)",
             (sender, receiver, message)
         )
         self.conn.commit()
     
     def get_and_delete_messages_for(self, receiver):
+        # pega as msgs offline e já apaga elas do banco
         cursor = self.conn.cursor()
-        # busca mensagens pendentes para o destinatário
-        cursor.execute("SELECT sender, message FROM offline_messages WHERE receiver=%s", (receiver,))
+        cursor.execute("SELECT sender, message FROM offline_messages WHERE receiver=?", (receiver,))
         messages = cursor.fetchall()
         if messages:
-            # apaga as mensagens já entregues
-            cursor.execute("DELETE FROM offline_messages WHERE receiver=%s", (receiver,))
+            cursor.execute("DELETE FROM offline_messages WHERE receiver=?", (receiver,))
             self.conn.commit()
         return messages
 
     # --- Grupos ---
 
     def create_group_tables(self):
-        # cria duas tabelas:
-        # 1. groups: só guarda o nome do grupo
-        # 2. group_members: liga users com grupos
-        #    (ON DELETE CASCADE: se apagar o grupo/user, limpa automático)
         cursor = self.conn.cursor()
+        # tabela simples só com nome do grupo
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS groups (
                 name TEXT PRIMARY KEY
             )
         """)
+        # tabela que liga users com grupos
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS group_members (
                 group_name TEXT,
@@ -120,36 +104,31 @@ class Database:
         self.conn.commit()
     
     def group_exists(self, group_name):
-        # ve se tem grupo com esse nome
+        # checa se tem grupo com esse nome
         cursor = self.conn.cursor()
-        # placeholder do psycopg2 usa %s
-        cursor.execute("SELECT 1 FROM groups WHERE name=%s", (group_name,))
+        cursor.execute("SELECT 1 FROM groups WHERE name=?", (group_name,))
         return cursor.fetchone() is not None
     
     def create_group(self, group_name):
+        # cria um grupo novo
         cursor = self.conn.cursor()
-        # cria o grupo (usa %s como placeholder)
-        cursor.execute("INSERT INTO groups (name) VALUES (%s)", (group_name,))
+        cursor.execute("INSERT INTO groups (name) VALUES (?)", (group_name,))
         self.conn.commit()
     
     def add_group_member(self, group_name, username):
+        # bota user no grupo (não dá erro se já tiver)
         cursor = self.conn.cursor()
-        # no postgres é ON CONFLICT DO NOTHING
-        # (mesma coisa que INSERT OR IGNORE do sqlite)
-        cursor.execute(
-            "INSERT INTO group_members (group_name, username) VALUES (%s, %s) ON CONFLICT DO NOTHING", 
-            (group_name, username)
-        )
+        cursor.execute("INSERT OR IGNORE INTO group_members (group_name, username) VALUES (?, ?)", (group_name, username))
         self.conn.commit()
     
     def get_group_members(self, group_name):
-        # lista todos os users de um grupo
+        # lista todo mundo do grupo
         cursor = self.conn.cursor()
-        cursor.execute("SELECT username FROM group_members WHERE group_name=%s", (group_name,))
+        cursor.execute("SELECT username FROM group_members WHERE group_name=?", (group_name,))
         return [row[0] for row in cursor.fetchall()]
     
     def get_groups_for_user(self, username):
-        # lista todos os grupos que o user tá
+        # mostra os grupos que o user tá
         cursor = self.conn.cursor()
-        cursor.execute("SELECT group_name FROM group_members WHERE username=%s", (username,))
+        cursor.execute("SELECT group_name FROM group_members WHERE username=?", (username,))
         return [row[0] for row in cursor.fetchall()]
