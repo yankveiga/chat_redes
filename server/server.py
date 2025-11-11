@@ -3,9 +3,9 @@ import threading
 import json
 
 # módulos que a gente criou
-from .database import Database
-from .user import UserManager
-from .group import GroupManager
+from database import Database
+from user import UserManager
+from group import GroupManager
 
 class ChatServer:
     # prepara o servidor com o IP e a porta local

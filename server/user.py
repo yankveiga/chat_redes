@@ -1,5 +1,6 @@
 # libs pra criptografia(nativo, como pedido)
 import hashlib  # faz o hash da senha
+import hmac
 import os
 
 class UserManager:
@@ -32,36 +33,24 @@ class UserManager:
         
         self.db.create_user(username, full_hash_string)
         return True
-    
+
     def authenticate(self, username, password):
-        # pega o hash salvo do user
         full_hash_string = self.db.get_user_password_hash(username)
         if not full_hash_string:
-            return False  # user não existe
-        
+            return False
+
         try:
-            # separa o sal do hash (tavam juntos com : no meio)
             salt_hex, stored_hash_hex = full_hash_string.split(':')
-            
-            # converte de texto pra bytes de novo
             salt = bytes.fromhex(salt_hex)
             stored_hash = bytes.fromhex(stored_hash_hex)
-
-            # faz o hash da senha que o user digitou
-            # usando o mesmo sal que tava guardado
             password_bytes = password.encode('utf-8')
             new_hashed_password = hashlib.pbkdf2_hmac(
-                'sha256', 
-                password_bytes, 
-                salt, 
+                'sha256',
+                password_bytes,
+                salt,
                 100000
             )
-            
-            # compara os hashes do jeito seguro
-            # (tem que ser timing_safe_compare pra não dar brecha)
-            return hashlib.timing_safe_compare(stored_hash, new_hashed_password)
-        
+            return hmac.compare_digest(stored_hash, new_hashed_password)
         except Exception as e:
-            # se der erro no formato do hash
             print(f"Erro ao autenticar {username}: {e}")
             return False
