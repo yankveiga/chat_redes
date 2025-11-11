@@ -1,130 +1,127 @@
 import socket
 import threading
 import json
-import os 
+import os
 
-# Flag para controlar as threads
-running = True 
+# Variável global para controlar se o app está rodando
+running = True
 
-#Boca do cliente
+# Envia um dicionário como JSON para o servidor
+# Se der erro, avisa e encerra o programa
 def send_json(sock, data):
-    # empacota e manda um dict em JSON pro servidor
     global running
     try:
         sock.send(json.dumps(data).encode('utf-8'))
     except (ConnectionResetError, BrokenPipeError):
         if running:
-            print("\n[ERRO] Não foi possível enviar dados. A conexão foi perdida.")
+            print("\n[CHATINHO | XABLAU] Opa, deu ruim! Não rolou enviar, conexão sumiu no rolê.")
         running = False
 
-# orelha do cliente — thread que recebe mensagens do servidor
+# Fica ouvindo mensagens do servidor e mostra na tela
+# Roda em uma thread separada
 def receive_messages(sock):
-    # roda numa thread só pra ficar ouvindo o servidor
     global running
     while running:
         try:
             data_raw = sock.recv(4096)
             if not data_raw:
                 if running:
-                    print("\n[INFO] Conexão perdida com o servidor.")
+                    print("\n[CHATINHO | INFO] Ih, o servidor foi tomar um café e te deixou falando sozinho.")
                 break
-            
-            # parseia o JSON e formata a mensagem conforme o tipo
+
             response = json.loads(data_raw.decode('utf-8'))
-            
-            # mostra a mensagem de acordo com o tipo (privada/grupo/status)
+
+            # Se for mensagem privada
             if response.get('type') == 'chat_message':
-                print(f"\n[DM de {response['sender']}]: {response['message']}")
+                print(f"\n[CHATINHO | Papinho a Dois de {response['sender']}]: {response['message']}")
+            # Se for mensagem de grupo
             elif response.get('type') == 'group_message':
-                print(f"\n[{response['group']} | {response['sender']}]: {response['message']}")
-            # Mensagens de status (erro, sucesso, info)
+                print(f"\n[CHATINHO | {response['group']} | {response['sender']}]: {response['message']}")
+            # Se for outra resposta (erro, sucesso, info)
             else:
                 status = response.get('status', 'info')
                 message = response.get('message', '')
-                
+
                 if status == 'error':
-                    print(f"\n[ERRO] {message}")
+                    print(f"\n[CHATINHO | XABLAU] {message} (deu ruim!)")
                 elif status == 'success':
-                    print(f"\n[SUCESSO] {message}")
+                    print(f"\n[CHATINHO | SUCESSO] {message} (deu bom!)")
                 else:
-                    print(f"\n[INFO] {message}")
-            # fim do parser de mensagens
+                    print(f"\n[CHATINHO | INFO] {message}")
 
         except (ConnectionResetError, json.JSONDecodeError):
             if running:
-                print("\n[ERRO] Erro de comunicação com o servidor.")
+                print("\n[CHATINHO | XABLAU] O servidor bugou, chama o suporte!")
             break
         except Exception as e:
             if running and e:
-                print(f"\n[ERRO] Ocorreu um erro inesperado: {e}")
+                print(f"\n[CHATINHO | XABLAU] Erro inesperado: {e} (bug sinistro!)")
             break
 
-    print("\nSessão de recebimento encerrada.")
+    print("\n[CHATINHO] Ouvinte cansou, sessão encerrada!")
     running = False
 
-# funções do menu e modo chat
-
+# Modo de conversa (papinho a dois ou grupo)
+# Envia mensagens até o usuário digitar /menu
+# Sai do chat e volta pro menu
 def start_chat_mode(sock):
-    """Entra no modo de conversa (DM ou Grupo)."""
-    print("\nVocê está no modo de conversa.")
-    print("Digite '/menu' para voltar ao menu principal.")
+    print("\n[CHATINHO] Você entrou no modo Papinho a Dois. Manda ver!")
+    print("[CHATINHO] Digite '/menu' se cansar do papo e quiser voltar pro menu.")
     while running:
         msg = input()
         if not running:
              break
-        
-        # Comando para sair do chat e voltar ao menu
+
         if msg == '/menu':
             send_json(sock, {"command": "leave_chat"})
-            print("Voltando ao menu...")
+            print("[CHATINHO] Voltando pro menu, sem ressentimentos...")
             break
-        
-        # Envia a mensagem para o contexto (DM/Grupo) atual
+
         if msg:
             send_json(sock, {"command": "send_message", "message": msg})
 
+# Mostra o menu principal e trata as opções do usuário
+# Aceita letras maiúsculas ou minúsculas
+# Chama as funções de acordo com a escolha
 def main_menu(sock):
-    """Mostra o menu principal e processa os comandos."""
     global running
     while running:
-        print("\n------- MENU PRINCIPAL -------")
-        print("1. Listar usuários e meus grupos")
-        print("2. Iniciar uma conversa DM")
-        print("3. Iniciar uma conversa em grupo")
-        print("4. Criar um novo grupo")
-        print("5. Adicionar membro a um grupo")
-        print("6. Sair")
+        print("\n     CHATINHO - MENU PRINCIPAL ")
+        print("A. Espiar galera e grupos")
+        print("B. Puxar um Papinho a Dois")
+        print("C. Mandar papo no grupo")
+        print("D. Criar um grupão")
+        print("E. Chamar mais gente pro grupão")
+        print("F. Meter o pé")
 
-        choice = input("O que gostaria de fazer?\nR: ")
+        choice = input("[CHATINHO] E aí, qual vai ser?\nR: ").strip().upper()
 
         if not running:
             break
 
-        if choice == '1':
+        if choice == 'A':
             send_json(sock, {"command": "list_all"})
-        
-        elif choice == '2':
-            target_user = input("\nCom quem deseja conversar?\nR: ")
+
+        elif choice == 'B':
+            target_user = input("\n[CHATINHO] Com quem vai ser o Papinho a Dois?\nR: ")
             if target_user:
-                # Avisa o servidor que queremos falar com 'target_user'
                 send_json(sock, {"command": "select_chat", "target_user": target_user})
-                start_chat_mode(sock) # Entra no loop de chat
+                start_chat_mode(sock)
 
-        elif choice == '3':
-            target_group = input("\nQual o grupo que você deseja mandar mensagem?\nR: ")
+        elif choice == 'C':
+            target_group = input("\n[CHATINHO] Qual grupão vai receber o papo?\nR: ")
             if target_group:
-                # Avisa o servidor que queremos falar no 'target_group'
                 send_json(sock, {"command": "select_chat", "target_group": target_group})
-                start_chat_mode(sock) # Entra no loop de chat
+                start_chat_mode(sock)
 
-        elif choice == '4':
-            group_name = input("\nQual o nome do novo grupo?\nR: ")
+        elif choice == 'D':
+            group_name = input("\n[CHATINHO] Nome do novo grupão?\nR: ")
             if group_name:
                 send_json(sock, {"command": "create_group", "group_name": group_name})
-        
-        elif choice == '5':
-            group_name = input("\nQual o grupo?\nR: ")
-            user_to_add = input(f"\nQual usuário você quer adicionar ao grupo '{group_name}'?\nR: ")
+
+        elif choice == 'E':
+            group_name = input("\n[CHATINHO] Qual grupão?\nR: ")
+            user_to_add = input(f"\n[CHATINHO] Quem vai entrar no grupão '{group_name}'?\nR: ")
             if group_name and user_to_add:
                 send_json(sock, {
                     "command": "add_member_to_group",
@@ -132,53 +129,50 @@ def main_menu(sock):
                     "user_to_add": user_to_add
                 })
 
-        elif choice == '6':
+        elif choice == 'F':
             running = False
             sock.close()
-            print("Desconectando...")
+            print("[CHATINHO] Falou, até a próxima!")
             break
         else:
-            print("[ERRO] Opção inválida.")
+            print("[CHATINHO | XABLAU] Opção inválida, tenta de novo!")
 
-# fim das funções de menu/chat
+# Função principal do cliente
+# Conecta no servidor, faz login/cadastro e inicia o menu
+# Cria a thread para receber mensagens
+# Encerra tudo ao sair
 
-
-#Função principal que liga o client ao Host
 def main():
     global running
-    # no Render a URL pública deve ser usada; pra testes locais, localhost tá de boa
     host = '0.tcp.sa.ngrok.io'
     port = 19918
 
-    # cria o socket do cliente
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    # tenta conectar no servidor
     try:
         client_socket.connect((host, port))
-        print(f"Conectado ao servidor em {host}:{port}")
+        print(f"[CHATINHO] Conectado! O rolê tá em {host}:{port}")
     except ConnectionRefusedError:
-        print(f"[ERRO] Não foi possível conectar ao servidor em {host}:{port}.")
-        print("Verifique se o servidor está rodando e se o endereço/porta estão corretos.")
+        print(f"[CHATINHO | XABLAU] Não deu pra conectar em {host}:{port}.")
+        print("[CHATINHO] Vê se o servidor tá de pé ou se o endereço tá certo.")
         return
 
-    # loop de autenticação: registra ou faz login
-    # (autenticação feita acima neste bloco)
-    while True: 
-        print("\n--- TELA INICIAL ---")
-        print("1. Login")
+    # Loop de autenticação (login ou cadastro)
+    while True:
+        print("\n   CHATINHO | TELA INICIAL ")
+        print("1. Login ")
         print("2. Cadastro")
-        action = input("O que gostaria de fazer? (1 ou 2): ")
+        action = input("[CHATINHO] Qual vai ser? (1 ou 2): ")
 
-        username = input("Nome de usuário: ")
-        password = input("Senha: ")
+        username = input("[CHATINHO] Codinome: ")
+        password = input("[CHATINHO] Senha secreta: ")
 
         if action == '1':
             auth_command = 'login'
         elif action == '2':
             auth_command = 'register'
         else:
-            print("[ERRO] Ação inválida. Tente '1' ou 2'.")
+            print("[CHATINHO | XABLAU] Ação inválida, só vale 1 ou 2!")
             continue
 
         send_json(client_socket, {
@@ -190,37 +184,35 @@ def main():
         try:
             response_raw = client_socket.recv(1024)
             if not response_raw:
-                print("[ERRO] Servidor encerrou a conexão inesperadamente.")
+                print("[CHATINHO | XABLAU] O servidor sumiu do mapa.")
                 return
 
             response = json.loads(response_raw.decode('utf-8'))
-            print(f"\n[{response['status'].upper()}] {response['message']}")
+            print(f"\n[CHATINHO | {response['status'].upper()}] {response['message']}")
 
             if response['status'] == 'success' and auth_command == 'login':
                 break
 
         except (json.JSONDecodeError, ConnectionResetError):
-             print("[ERRO] Falha na comunicação durante a autenticação.")
+             print("[CHATINHO | XABLAU] Bugou na autenticação, tenta de novo!")
              return
 
-    # pós-auth: inicia thread de recepção e mostra menu
-    # inicializa a "orelha" que fica recebendo mensagens
+    # Cria a thread para receber mensagens do servidor
     receiver_thread = threading.Thread(target=receive_messages, args=(client_socket,))
-    receiver_thread.daemon = True # Se o programa principal terminar ele encerra a thread
-    receiver_thread.start() # Inicia a "Orelha"
-    
-    #Enquanto a orelha escuta, o programa principal (Boca) mostra o menu 
+    receiver_thread.daemon = True
+    receiver_thread.start()
+
     try:
         main_menu(client_socket)
     except KeyboardInterrupt:
-        print("\nSaindo (Ctrl+C)...")
+        print("\n[CHATINHO] Saiu no sapatinho (Ctrl+C)...")
 
-    # Finalização
     running = False
     client_socket.close()
-    receiver_thread.join(timeout=1) # Espera a thread do "Ouvido" fechar
-    print("Programa cliente encerrado.")
-    os._exit(0) # Força o encerramento de todas as threads
+    receiver_thread.join(timeout=1)
+    print("[CHATINHO] Fim de papo, até mais!")
+    os._exit(0)
 
+# Só roda o main se for executado direto
 if __name__ == "__main__":
     main()
