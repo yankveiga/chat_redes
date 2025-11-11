@@ -43,9 +43,9 @@ def receive_messages(sock):
                 message = response.get('message', '')
 
                 if status == 'error':
-                    print(f"\n[CHATINHO | XABLAU] {message} (deu ruim!)")
+                    print(f"\n[CHATINHO | XABLAU] {message} - OPS!")
                 elif status == 'success':
-                    print(f"\n[CHATINHO | SUCESSO] {message} (deu bom!)")
+                    print(f"\n[CHATINHO | SUCESSO] {message} - UHUL!)")
                 else:
                     print(f"\n[CHATINHO | INFO] {message}")
 
@@ -64,9 +64,13 @@ def receive_messages(sock):
 # Modo de conversa (papinho a dois ou grupo)
 # Envia mensagens até o usuário digitar /menu
 # Sai do chat e volta pro menu
-def start_chat_mode(sock):
-    print("\n[CHATINHO] Você entrou no modo Papinho a Dois. Manda ver!")
-    print("[CHATINHO] Digite '/menu' se cansar do papo e quiser voltar pro menu.")
+def start_chat_mode(sock, chat_type=None, chat_name=None):
+    if chat_type == 'group':
+        print(f"\n[CHATINHO] Você entrou no grupão '{chat_name}'. Solta o papo aí!")
+        print("[CHATINHO] Digite '/menu' se cansar do papo e quiser voltar pro menu.")
+    else:
+        print("\n[CHATINHO] Você entrou no modo Papinho a Dois. Manda ver!")
+        print("[CHATINHO] Digite '/menu' se cansar do papo e quiser voltar pro menu.")
     while running:
         msg = input()
         if not running:
@@ -106,13 +110,13 @@ def main_menu(sock):
             target_user = input("\n[CHATINHO] Com quem vai ser o Papinho a Dois?\nR: ")
             if target_user:
                 send_json(sock, {"command": "select_chat", "target_user": target_user})
-                start_chat_mode(sock)
+                start_chat_mode(sock, chat_type='user', chat_name=target_user)
 
         elif choice == 'C':
             target_group = input("\n[CHATINHO] Qual grupão vai receber o papo?\nR: ")
             if target_group:
                 send_json(sock, {"command": "select_chat", "target_group": target_group})
-                start_chat_mode(sock)
+                start_chat_mode(sock, chat_type='group', chat_name=target_group)
 
         elif choice == 'D':
             group_name = input("\n[CHATINHO] Nome do novo grupão?\nR: ")
