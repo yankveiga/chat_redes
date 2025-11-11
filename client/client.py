@@ -147,8 +147,8 @@ def main_menu(sock):
 def main():
     global running
     # no Render a URL pública deve ser usada; pra testes locais, localhost tá de boa
-    host = '127.0.0.1' 
-    port = 12345
+    host = '0.tcp.sa.ngrok.io'
+    port = 19918
 
     # cria o socket do cliente
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

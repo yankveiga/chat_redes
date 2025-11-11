@@ -15,9 +15,9 @@ class ChatServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         
         # dicionários pra controlar quem tá online e conversando
-        self.clients = {}         # socket -> nome do user
-        self.users_online = {}    # nome do user -> socket
-        self.chat_context = {}    # nome do user -> {tipo: user/grupo, alvo: nome}
+        self.clients = {}         # socket
+        self.users_online = {}    # nome do user
+        self.chat_context = {}    # nome do user
         
         # inicializa o banco de dados (o arquivo chat.db)
         self.db = Database() 
@@ -57,7 +57,7 @@ class ChatServer:
         # essa função roda na thread de cada cliente
         username = None # começa deslogado
         try:
-            # --- LOOP DE LOGIN/REGISTRO ---
+            #loop login/registro
             # o cliente fica preso aqui até logar
             while True:
                 # espera receber o JSON de auth (1kb tá de boa)
@@ -91,7 +91,7 @@ class ChatServer:
                             self.send_json(client_socket, {"status": "error", "message": "Este usuário já está logado."})
                             continue # volta pro começo do loop
                         
-                        # --- LOGIN OK ---
+                        # login com sucesso
                         username = user # agora sim, ele tem nome
                         self.clients[client_socket] = username # guarda no dict 1
                         self.users_online[username] = client_socket # guarda no dict 2
@@ -105,7 +105,7 @@ class ChatServer:
                 else:
                     self.send_json(client_socket, {"status": "error", "message": "Comando de autenticação inválido."})
 
-            # --- FIM DO LOOP DE AUTH ---
+            #  fim do loop de autenticacao
             # (se chegou aqui, tá logado)
 
             # 1. busca no banco se tem msg offline pra ele
@@ -117,7 +117,7 @@ class ChatServer:
                 for sender, msg_text in offline_msgs:
                     self.send_json(client_socket, {"type": "chat_message", "sender": sender, "message": msg_text})
             
-            # --- LOOP DE COMANDOS (MENU) ---
+            # loop menu
             # agora fica aqui ouvindo os comandos do menu
             while True:
                 message_raw = client_socket.recv(4096).decode('utf-8')

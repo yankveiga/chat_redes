@@ -35,22 +35,29 @@ class UserManager:
         return True
 
     def authenticate(self, username, password):
+        # Busca o hash completo do usuário no banco de dados
         full_hash_string = self.db.get_user_password_hash(username)
         if not full_hash_string:
+            # Usuário não encontrado
             return False
 
         try:
+            # Separa o sal e o hash armazenados
             salt_hex, stored_hash_hex = full_hash_string.split(':')
             salt = bytes.fromhex(salt_hex)
             stored_hash = bytes.fromhex(stored_hash_hex)
+            # Codifica a senha informada pelo usuário
             password_bytes = password.encode('utf-8')
+            # Gera o hash da senha informada usando o mesmo sal e parâmetros
             new_hashed_password = hashlib.pbkdf2_hmac(
                 'sha256',
                 password_bytes,
                 salt,
                 100000
             )
+            # Compara o hash gerado com o hash armazenado de forma segura
             return hmac.compare_digest(stored_hash, new_hashed_password)
         except Exception as e:
+            # Em caso de erro, imprime mensagem e retorna False
             print(f"Erro ao autenticar {username}: {e}")
             return False

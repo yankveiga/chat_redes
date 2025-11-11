@@ -9,7 +9,7 @@ class Database:
         self.create_message_table()
         self.create_group_tables()
     
-    # --- Funções dos Usuários ---
+    # funcoes dos usuarios
 
     def create_user_table(self):
         cursor = self.conn.cursor()
@@ -46,7 +46,7 @@ class Database:
         cursor.execute("SELECT username FROM users")
         return [row[0] for row in cursor.fetchall()]
 
-    # --- Mensagens Offline ---
+    # mensagens offiline
     
     def create_message_table(self):
         # guarda mensagens enviadas quando o user tá offline
@@ -81,7 +81,7 @@ class Database:
             self.conn.commit()
         return messages
 
-    # --- Grupos ---
+    # Grupos
 
     def create_group_tables(self):
         cursor = self.conn.cursor()
